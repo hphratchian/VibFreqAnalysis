@@ -1,0 +1,15 @@
+%chk=test002
+#p test hf opt
+
+test
+
+-1  1
+o(iso=1.0)
+h(iso=1.0)  1  1.0
+
+--link1--
+%chk=test002
+#p test geom=allcheck guess=read chkmth chkbas freq output=mat
+
+test002.mat
+

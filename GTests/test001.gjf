@@ -1,0 +1,14 @@
+%chk=test001
+#p test hf geom=modela opt
+
+test
+
+0  1
+c oh h h me
+
+--link1--
+%chk=test001
+#p test geom=allcheck guess=read chkmth chkbas freq output=mat
+
+test001.mat
+
