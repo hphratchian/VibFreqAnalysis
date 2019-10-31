@@ -2,6 +2,8 @@
       use mqc_general
       use iso_fortran_env
 !
+      implicit none
+      real(kind=real64),parameter::bohr2ang=0.529177d0
       CONTAINS
 !
 !
@@ -25,6 +27,24 @@
 !
       return
       end function outerProduct
+
+!
+!     PROCEDURE unitMatrix
+!
+      function unitMatrix(nDim) result(outMat)
+      implicit none
+      integer(kind=int64),intent(in)::nDim
+      real(kind=real64),dimension(:,:),allocatable,intent(out)::outMat
+      integer(kind=int64)::i
+!
+      Allocate(outMat(nDim,nDim))
+      outMat = float(0)
+      do i = 1,nDim
+        outMat(i,i) = float(1)
+      endDo
+!
+      return
+      end function unitMatrix
 
 !
 !     PROCEDURE MassWeighVector
@@ -127,6 +147,125 @@
       end subroutine mySVD
 
 
+!     PROCEDURE momentsOfInertia
+!
+      subroutine momentsOfInertia(iOut,nAtoms,cartesians,atomicMasses,  &
+        nRot,RotVecs)
+      implicit none
+      integer(kind=int64),intent(in)::iOut,nAtoms
+      real(kind=real64),dimension(:),intent(in)::cartesians,atomicMasses
+      integer(kind=int64),intent(out)::nRot
+      real(kind=real64),dimension(3*nAtoms,3),intent(inOut)::RotVecs
+!
+      integer(kind=int64)::i,j,iCartOff
+      real(kind=real64)::totalMass,cartXP,cartYP,cartZP
+      real(kind=real64),dimension(3)::centerOfMass
+      real(kind=real64),dimension(:),allocatable::cartesiansCOM
+      real(kind=real64),dimension(3)::inertiaEVals
+      real(kind=real64),dimension(3,3)::inertiaMat,inertiaEVecs
+      real(kind=real64),parameter::Small=1.0d-6
+!
+!
+!     Begin by finding the center of mass.
+!
+      call mqc_print(iOut,cartesians*bohr2ang,header='input cartesians (A)')
+      totalMass = SUM(atomicMasses)
+      centerOfMass = float(0)
+      do i = 1,nAtoms
+        iCartOff = (i-1)*3
+        centerOfMass(1) = centerOfMass(1) + atomicMasses(i)*cartesians(iCartOff+1)
+        centerOfMass(2) = centerOfMass(2) + atomicMasses(i)*cartesians(iCartOff+2)
+        centerOfMass(3) = centerOfMass(3) + atomicMasses(i)*cartesians(iCartOff+3)
+      endDo
+      centerOfMass = centerOfMass/totalMass
+      Allocate(cartesiansCOM(3*nAtoms))
+      cartesiansCOM = float(0)
+      call mqc_print(iout,cartesians,header='before moving to COM, carts:')
+      do i = 1,nAtoms
+        iCartOff = (i-1)*3
+        write(iout,*)' Hrant - i       =',i
+        write(IOut,*)'         iCartOff=',iCartOff
+        cartesiansCOM(iCartOff+1) = cartesians(iCartOff+1) - centerOfMass(1)
+        cartesiansCOM(iCartOff+2) = cartesians(iCartOff+2) - centerOfMass(2)
+        cartesiansCOM(iCartOff+3) = cartesians(iCartOff+3) - centerOfMass(3)
+      endDo
+      call mqc_print(iOut,centerOfMass*bohr2ang,header='COM (A)')
+      call mqc_print(iOut,cartesiansCOM*bohr2ang,header='cartesiansCOM (A)')
+!
+!     Build the inertia matrix. Then, diagaonalize the matrix to solve for the
+!     principal moments and associated eigenvectors.
+!
+      inertiaMat = float(0)
+      do i = 1,nAtoms
+        iCartOff = (i-1)*3
+        inertiaMat(1,1) = inertiaMat(1,1) + atomicMasses(i)*  &
+          (cartesiansCOM(iCartOff+2)**2+cartesiansCOM(iCartOff+3)**2)
+        inertiaMat(2,1) = inertiaMat(2,1) - atomicMasses(i)*  &
+          cartesiansCOM(iCartOff+1)*cartesiansCOM(iCartOff+2)
+        inertiaMat(3,1) = inertiaMat(3,1) - atomicMasses(i)*  &
+          cartesiansCOM(iCartOff+1)*cartesiansCOM(iCartOff+3)
+        inertiaMat(2,2) = inertiaMat(2,2) + atomicMasses(i)*  &
+          (cartesiansCOM(iCartOff+1)**2+cartesiansCOM(iCartOff+3)**2)
+        inertiaMat(3,2) = inertiaMat(3,2) - atomicMasses(i)*  &
+          cartesiansCOM(iCartOff+2)*cartesiansCOM(iCartOff+3)
+        inertiaMat(3,3) = inertiaMat(3,3) + atomicMasses(i)*  &
+          (cartesiansCOM(iCartOff+1)**2+cartesiansCOM(iCartOff+2)**2)
+      endDo
+      inertiaMat(1,2) = inertiaMat(2,1)
+      inertiaMat(1,3) = inertiaMat(3,1)
+      inertiaMat(2,3) = inertiaMat(3,2)
+      call mqc_print(iout,inertiaMat,header='Inertia Matrix:')
+      call mySVD(iOut,3,inertiaMat,inertiaEVals,inertiaEVecs)
+      call mqc_print(IOut,inertiaEVals,header='inertia Eigenvalues')
+      call mqc_print(IOut,inertiaEVecs,header='inertia Eigenvectors')
+      do i = 1,3
+        if(ABS(inertiaEVals(i)).gt.Small) nRot = nRot+1
+      endDo
+!
+!     Build the three (or two) overall-rotational vectors and determine nRot.
+!
+      nRot = 0
+      do i = 1,3
+        if(ABS(inertiaEVals(i)).gt.Small) nRot = nRot+1
+      endDo
+      if(nRot.ne.2.and.nRot.ne.3)  &
+        call mqc_error('Incorrect number of rotational DOF.')
+      do j = 1,nAtoms
+        iCartOff = (j-1)*3
+        cartXP = cartesiansCOM(iCartOff+1)*inertiaEVecs(1,1) +  &
+          cartesiansCOM(iCartOff+2)*inertiaEVecs(2,1) +  &
+          cartesiansCOM(iCartOff+3)*inertiaEVecs(3,1)
+        cartYP = cartesiansCOM(iCartOff+1)*inertiaEVecs(1,2) +  &
+          cartesiansCOM(iCartOff+2)*inertiaEVecs(2,2) +  &
+          cartesiansCOM(iCartOff+3)*inertiaEVecs(2,3)
+        cartZP = cartesiansCOM(iCartOff+1)*inertiaEVecs(1,3) +  &
+          cartesiansCOM(iCartOff+2)*inertiaEVecs(2,3) +  &
+          cartesiansCOM(iCartOff+3)*inertiaEVecs(3,3)
+        RotVecs(iCartOff+1,1) = cartYP*inertiaEVecs(1,3)-cartZP*inertiaEVecs(1,2)
+        RotVecs(iCartOff+2,1) = cartYP*inertiaEVecs(2,3)-cartZP*inertiaEVecs(2,2)
+        RotVecs(iCartOff+3,1) = cartYP*inertiaEVecs(3,3)-cartZP*inertiaEVecs(3,2)
+
+        RotVecs(iCartOff+1,2) = cartZP*inertiaEVecs(1,1)-cartXP*inertiaEVecs(1,3)
+        RotVecs(iCartOff+2,2) = cartZP*inertiaEVecs(2,1)-cartXP*inertiaEVecs(2,3)
+        RotVecs(iCartOff+3,2) = cartZP*inertiaEVecs(3,1)-cartXP*inertiaEVecs(3,3)
+        if(nRot.eq.3) then
+          RotVecs(iCartOff+1,3) = cartXP*inertiaEVecs(1,2)-cartYP*inertiaEVecs(1,1)
+          RotVecs(iCartOff+2,3) = cartXP*inertiaEVecs(2,2)-cartYP*inertiaEVecs(2,1)
+          RotVecs(iCartOff+3,3) = cartXP*inertiaEVecs(3,2)-cartYP*inertiaEVecs(3,1)
+        else
+          RotVecs(iCartOff+1,3) = float(0)
+          RotVecs(iCartOff+2,3) = float(0)
+          RotVecs(iCartOff+3,3) = float(0)
+        endIf
+      endDo
+      call massWeighVector(.true.,atomicMasses,RotVecs(:,1))
+      call massWeighVector(.true.,atomicMasses,RotVecs(:,2))
+      call massWeighVector(.true.,atomicMasses,RotVecs(:,3))
+      call mqc_print(iOut,RotVecs,header='Overall rotation vector:')
+!
+      end subroutine momentsOfInertia
+
+
       End Module VibAnalysisMod
 
 
@@ -153,9 +292,12 @@
 !
       implicit none
       integer(kind=int64),parameter::IOut=6
-      integer(kind=int64)::i,nAtoms,nAt3
-      real(kind=real64),dimension(:),allocatable::atomicMasses,hEVals
-      real(kind=real64),dimension(:,:),allocatable::hMat,hEVecs,hMatMW
+      integer(kind=int64)::i,j,nAtoms,nAt3,nRot
+      real(kind=real64)::fudge
+      real(kind=real64),dimension(:),allocatable::cartesians,  &
+        atomicMasses,hEVals,tmpVec
+      real(kind=real64),dimension(:,:),allocatable::hMat,hEVecs,hMatMW,  &
+        hMatProjector,RotVecs
       character(len=512)::matrixFilename
       type(mqc_gaussian_unformatted_matrix_file)::GMatrixFile
       type(MQC_Variable)::forceConstants
@@ -182,6 +324,10 @@
 !
       nAt3 = 3*nAtoms
       Allocate(hEVecs(nAt3,nAt3),hEVals(nAt3),hMatMW(NAt3,NAt3))
+!
+!     Load the Cartesian coordinates.
+!
+      cartesians = GMatrixFile%getAtomCarts()
 !
 !     Load the nuclear force constant matrix.
 !
@@ -217,11 +363,61 @@
       endDo
       call mqc_print(IOut,hEVecs,header='Un-MW Left Eigenvectors')
 !
-!     Now, we need to build projectors to remove possible contamination from
-!     overall rotational degrees of freedom.
+!     Now, let's build up a projector to remove possible contamination from
+!     overall translational degrees of freedom.
 !
-
-
-
-
+      Allocate(hMatProjector(nAt3,nAt3))
+      if(Allocated(tmpVec)) deAllocate(tmpVec)
+      Allocate(tmpVec(nAt3))
+      hMatProjector = float(0)
+      call mqc_print(IOut,hMatProjector,header='Initial Hessian Projector')
+      do i = 1,3
+        tmpVec = float(0)
+        do j = 0,nAtoms-1
+          tmpVec(3*j+i) = float(1)
+        endDo
+        call massWeighVector(.true.,atomicMasses,tmpVec)
+        call mqc_print(IOut,tmpVec,header='MW translational projection vector.')
+        hMatProjector = hMatProjector + outerProduct(tmpVec,tmpVec)
+        call mqc_print(IOut,hMatProjector,header='Current Hessian Projector')
+      endDo
+!
+!     Determine the moments of inertia and principle axes of rotation.
+!
+      write(IOut,*)
+      write(iOut,*)
+      write(iOut,*)' Calling MoI Routine...'
+      Allocate(RotVecs(nAt3,3))
+      call momentsOfInertia(iOut,nAtoms,cartesians,atomicMasses,nRot,RotVecs)
+      write(iOUt,*)' After momentsOfIneria: nRot=',nRot
+      call mqc_print(iOut,RotVecs,header='RotVecs in Main Program Unit-1:')
+      call mqc_normalizeVector(RotVecs(:,1))
+      call mqc_normalizeVector(RotVecs(:,2))
+      call mqc_normalizeVector(RotVecs(:,3))
+      call mqc_print(iOut,RotVecs,header='RotVecs in Main Program Unit-2:')
+      write(IOut,*)
+      write(IOut,*)
+      write(IOut,*)
+      write(iOut,*)' Back from MoI Routine.'
+      write(IOut,*)
+      do i = 1,nRot
+        hMatProjector = hMatProjector + outerProduct(RotVecs(:,i),RotVecs(:,i))
+        call mqc_print(IOut,hMatProjector,header='Current Hessian Projector')
+      endDo
+!
+!     Prepare the operator to project out the subspace in hMatProjector.
+!
+      hMatProjector = unitMatrix(nAt3) - hMatProjector
+      call mqc_print(IOut,hMatProjector,header='Final Hessian Projector')
+!
+!     Now, apply the projector to the MW Hessian and diagonalize again.
+!
+      hMatMW = MatMul(hMatProjector,hMatMW)
+      call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
+      call mqc_print(IOut,hEVals,header='MW Eigenvalues')
+      call mqc_print(IOut,hEVecs,header='MW Left Eigenvectors')
+      fudge = 24162.35735
+      hEVals = hEVals*fudge
+      call mqc_print(IOut,hEVals,header='MW Eigenvalues (cm-1)')
+!
       end program VibAnalysis
