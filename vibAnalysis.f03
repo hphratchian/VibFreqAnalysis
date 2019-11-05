@@ -7,6 +7,56 @@
       CONTAINS
 !
 !
+!     PROCEDURE OrthogonalizeVector
+!
+      subroutine orthogonalizeVector(nHave,vectorList,vector)
+!
+!     This subroutine takes a vector and orthogonalizes is relative to the nHave
+!     column vectors in vectorList.
+!
+      implicit none
+      integer(kind=int64),intent(in)::nHave
+      real(kind=real64),dimension(:,:),intent(in)::vectorList
+      real(kind=real64),dimension(:),intent(inOut)::vector
+      integer(kind=int64)::i,iTry,nDim
+      real(kind=real64)::tmpMagnitude
+      real(kind=real64),dimension(:),allocatable::tmpVector
+      real(kind=real64),parameter::Small=1.0d-6
+!
+!     Start by determining nDim. Then do a couple santity checks.
+!
+      if(nHave.lt.1) call mqc_error('OrthogonalizeVector: nHave < 1.')
+      nDim = Size(vector)
+      if(nDim.ne.Size(vectorList,1)) call mqc_error('OrthongalizeVector: vectorList has wrong dimension.')
+      Allocate(tmpVector(nDim))
+!
+!     Begin by initializing the input vector with a 1 in a trial location.
+      write(6,*)
+      write(6,*)
+      write(6,*)' OrthogonalizeVector: nHave=',nHave
+      do iTry = 1,nDim
+        do i = 1,nHave
+          call mqc_normalizeVector(vectorList(:,i))
+          call mqc_print(6,vector,header='Current Vector')
+          tmpMagnitude = dot_product(vectorList(:,i),vector)
+          vector = vector - tmpMagnitude*vectorList(:,i)
+          tmpMagnitude = dot_product(vector,vector)
+          if(tmpMagnitude.lt.Small) exit
+        endDo
+        if(tmpMagnitude.gt.Small) exit
+        vector = tmpVector
+        vector(iTry) = vector(iTry) + float(1)
+      endDo
+      if(tmpMagnitude.le.Small) call mqc_error('Failed making orthog vector.')
+      call mqc_normalizeVector(vector)
+      call mqc_print(6,vector,header='FINAL Vector')
+      write(6,*)
+      write(6,*)
+!
+      return
+      end subroutine orthogonalizeVector
+
+!
 !     PROCEDURE OuterProduct
 !
       function outerProduct(v1,v2) result(outMat)
@@ -82,32 +132,20 @@
       logical,intent(in)::DoMultiplyOrDivide
       real(kind=real64),dimension(:),intent(in)::AtomicMasses
       real(kind=real64),dimension(:,:),intent(inOut)::Matrix
-      integer(kind=int64)::i,j,k,nAtoms
+      integer(kind=int64)::i,j,iAtom,jAtom,nAtoms,nAt3
 !
       if(3*Size(AtomicMasses).ne.Size(Matrix,1))  & 
         call mqc_error('MassWeighMatrix has Matrix and AtomicMasses with different lengths.')
       nAtoms = Size(AtomicMasses)
-      do i = 1,nAtoms
-        k = 3*(i-1)+1
-        if(DoMultiplyOrDivide) then
-          Matrix(k,:)   = Matrix(k,:)*SQRT(AtomicMasses(i))
-          Matrix(k+1,:) = Matrix(k+1,:)*SQRT(AtomicMasses(i))
-          Matrix(k+2,:) = Matrix(k+2,:)*SQRT(AtomicMasses(i))
-        else
-          Matrix(k,:)   = Matrix(k,:)/SQRT(AtomicMasses(i))
-          Matrix(k+1,:) = Matrix(k+1,:)/SQRT(AtomicMasses(i))
-          Matrix(k+2,:) = Matrix(k+2,:)/SQRT(AtomicMasses(i))
-        endIf
-        do j = 1,NAtoms
-          k = 3*(j-1)+1
+      nAt3 = 3*nAtoms
+      do i = 1,nAt3
+        iAtom = (i+2)/3
+        do j = 1,nAt3
+          jAtom = (j+2)/3
           if(DoMultiplyOrDivide) then
-            Matrix(:,k)   = Matrix(:,k)*SQRT(AtomicMasses(i))
-            Matrix(:,k+1) = Matrix(:,k+1)*SQRT(AtomicMasses(i))
-            Matrix(:,k+2) = Matrix(:,k+2)*SQRT(AtomicMasses(i))
+            Matrix(i,j) = Matrix(i,j)*SQRT(AtomicMasses(iAtom)*AtomicMasses(jAtom))
           else
-            Matrix(:,k)   = Matrix(:,k)/SQRT(AtomicMasses(i))
-            Matrix(:,k+1) = Matrix(:,k+1)/SQRT(AtomicMasses(i))
-            Matrix(:,k+2) = Matrix(:,k+2)/SQRT(AtomicMasses(i))
+            Matrix(i,j) = Matrix(i,j)/SQRT(AtomicMasses(iAtom)*AtomicMasses(jAtom))
           endIf
         endDo
       endDo
@@ -168,7 +206,11 @@
 !
 !     Begin by finding the center of mass.
 !
-      call mqc_print(iOut,cartesians*bohr2ang,header='input cartesians (A)')
+      write(IOut,*)
+      write(IOut,*)
+      write(IOut,*)
+      write(IOut,*)
+      call mqc_print(iOut,cartesians,header='input cartesians (au)')
       totalMass = SUM(atomicMasses)
       centerOfMass = float(0)
       do i = 1,nAtoms
@@ -189,8 +231,8 @@
         cartesiansCOM(iCartOff+2) = cartesians(iCartOff+2) - centerOfMass(2)
         cartesiansCOM(iCartOff+3) = cartesians(iCartOff+3) - centerOfMass(3)
       endDo
-      call mqc_print(iOut,centerOfMass*bohr2ang,header='COM (A)')
-      call mqc_print(iOut,cartesiansCOM*bohr2ang,header='cartesiansCOM (A)')
+      call mqc_print(iOut,centerOfMass,header='COM (au)')
+      call mqc_print(iOut,cartesiansCOM,header='cartesiansCOM (au)')
 !
 !     Build the inertia matrix. Then, diagaonalize the matrix to solve for the
 !     principal moments and associated eigenvectors.
@@ -292,12 +334,14 @@
 !
       implicit none
       integer(kind=int64),parameter::IOut=6
-      integer(kind=int64)::i,j,nAtoms,nAt3,nRot
-      real(kind=real64)::fudge
+      integer(kind=int64)::i,j,nAtoms,nAt3,nRot,nVib
+      real(kind=real64),parameter::scaleHess=548.5799089940967d0,  &
+        scale2wavenumber = 48169.11381488435d0
       real(kind=real64),dimension(:),allocatable::cartesians,  &
         atomicMasses,hEVals,tmpVec
       real(kind=real64),dimension(:,:),allocatable::hMat,hEVecs,hMatMW,  &
-        hMatProjector,RotVecs
+        hMatProjectorVectors,hMatProjector,RotVecs,tmpMat1,tmpMat2,  &
+        tmpMat3
       character(len=512)::matrixFilename
       type(mqc_gaussian_unformatted_matrix_file)::GMatrixFile
       type(MQC_Variable)::forceConstants
@@ -329,18 +373,14 @@
 !
       cartesians = GMatrixFile%getAtomCarts()
 !
-!     Load the nuclear force constant matrix.
+!     Load the nuclear force constant matrix. Note that for numerical stability
+!     reasons, we precondition the force constant matrix by the first part of
+!     the conversion from AU to wavenumbers.
 !
       call GMatrixFile%getArray('NUCLEAR FORCE CONSTANTS',mqcVarOut=forceConstants)
       call forceConstants%print(header='force constant matrix')
       hMat = forceConstants
       call mqc_print(IOut,hMat,header='Hessian-FULL')
-!
-!     Diagonalize the hessian...
-!
-      call mySVD(iOut,nAt3,hMat,hEVals,hEVecs)
-      call mqc_print(IOut,hEVals,header='Eigenvalues')
-      call mqc_print(IOut,hEVecs,header='Left Eigenvectors')
 !
 !     Get the atomic masses then mass-weigh the hessian..
 !
@@ -349,23 +389,25 @@
       call mqc_print(iout,atomicMasses,header='Atomic Masses')
       hMatMW = hMat
       call massWeighMatrix(.false.,atomicMasses,hMatMW)
+      call mqc_print(IOut,hMatMW,header='Hessian-FULL after MW''ing')
+      hMatMW = hMatMW*scaleHess
+      call mqc_print(IOut,hMatMW,header='Hessian-FULL after scaleHess')
 !
-!     Diagonalize the mass-weighted hessian...
+!     Diagonalize the mass-weighted hessian. This is done prior to projection of
+!     translation/rotation/frozen-atom constrains.
 !
       call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
       call mqc_print(IOut,hEVals,header='MW Eigenvalues')
       call mqc_print(IOut,hEVecs,header='MW Left Eigenvectors')
+      hEVals = hEVals*scale2wavenumber
+      hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
+      call mqc_print(IOut,hEVals,header='MW Eigenvalues (cm-1)')
 !
-!     Un-mass-weigh the eigenvectors and re-print them.
+!     Now, build up a projector to remove possible contamination from overall
+!     translational degrees of freedom.
 !
-      do i = 1,NAt3
-        call massWeighVector(.false.,atomicMasses,hEVecs(:,i))
-      endDo
-      call mqc_print(IOut,hEVecs,header='Un-MW Left Eigenvectors')
-!
-!     Now, let's build up a projector to remove possible contamination from
-!     overall translational degrees of freedom.
-!
+      Allocate(hMatProjectorVectors(nAt3,6))
+      hMatProjectorVectors = float(0)
       Allocate(hMatProjector(nAt3,nAt3))
       if(Allocated(tmpVec)) deAllocate(tmpVec)
       Allocate(tmpVec(nAt3))
@@ -377,10 +419,15 @@
           tmpVec(3*j+i) = float(1)
         endDo
         call massWeighVector(.true.,atomicMasses,tmpVec)
+        call mqc_normalizeVector(tmpVec)
+        hMatProjectorVectors(:,i) = tmpVec
         call mqc_print(IOut,tmpVec,header='MW translational projection vector.')
         hMatProjector = hMatProjector + outerProduct(tmpVec,tmpVec)
         call mqc_print(IOut,hMatProjector,header='Current Hessian Projector')
       endDo
+
+!hph      goto 999
+
 !
 !     Determine the moments of inertia and principle axes of rotation.
 !
@@ -400,6 +447,9 @@
       write(IOut,*)
       write(iOut,*)' Back from MoI Routine.'
       write(IOut,*)
+      hMatProjectorVectors(:,4) = RotVecs(:,1)
+      hMatProjectorVectors(:,5) = RotVecs(:,2)
+      hMatProjectorVectors(:,6) = RotVecs(:,3)
       do i = 1,nRot
         hMatProjector = hMatProjector + outerProduct(RotVecs(:,i),RotVecs(:,i))
         call mqc_print(IOut,hMatProjector,header='Current Hessian Projector')
@@ -407,17 +457,104 @@
 !
 !     Prepare the operator to project out the subspace in hMatProjector.
 !
-      hMatProjector = unitMatrix(nAt3) - hMatProjector
+      call mqc_print(iOut,hMatProjectorVectors,header='Projection Vectors')
+      hMatProjector = unitMatrix(nAt3) -  &
+        MatMul(hMatProjectorVectors,Transpose(hMatProjectorVectors))
       call mqc_print(IOut,hMatProjector,header='Final Hessian Projector')
+      do i = 1,6
+        hMatProjector = hMatProjector +  &
+          outerProduct(hMatProjectorVectors(:,1),hMatProjectorVectors(:,1))
+      endDo
+      hMatProjector = unitMatrix(nAt3) - hMatProjector
+      call mqc_print(iOut,hMatProjector,header='hMatProjector, again...')
 !
-!     Now, apply the projector to the MW Hessian and diagonalize again.
+!     Build the projection matrix into tmpMat1.
 !
-      hMatMW = MatMul(hMatProjector,hMatMW)
-      call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
-      call mqc_print(IOut,hEVals,header='MW Eigenvalues')
-      call mqc_print(IOut,hEVecs,header='MW Left Eigenvectors')
-      fudge = 24162.35735
-      hEVals = hEVals*fudge
+      Allocate(tmpMat1(nAt3,nAt3))
+      tmpMat1 = float(0)
+      tmpMat1(:,1:3+nRot) = hMatProjectorVectors
+      write(iOut,*)
+      write(iOut,*)
+      call mqc_print(iOut,tmpMat1,header='tmpMat1 before Gram-Schmidt...')
+      do i = nRot+4,NAt3
+        write(IOut,*)
+        write(iOUt,*)
+        write(IOut,*)' Hrant'
+        write(iOut,*)' Orthogonalizing vector i=',i
+        tmpMat1(i,i) = float(1)
+        if(i.eq.(nRot+4)) then
+          tmpMat1(:,i) = float(0)
+          tmpMat1(2,i) =  0.256965
+          tmpMat1(5,i) = -0.511850
+          tmpMat1(6,i) =  0.452762
+          tmpMat1(8,i) = -0.511850
+          tmpMat1(9,i) = -0.452762
+        endIf
+        call orthogonalizeVector(i-1,tmpMat1(:,1:i-1),tmpMat1(:,i))
+        call mqc_print(iOut,tmpMat1,header='tmpMat1')
+      endDo
+      write(iOut,*)
+      write(iOut,*)
+      write(iOut,*)' Check of normalization of vector space...'
+      do i = 1,nAt3
+        write(iOut,*)' Hrant - i=',i,'   < i | i >=',dot_product(tmpMat1(:,i),tmpMat1(:,i))
+      endDo
+      call mqc_print(iOut,MatMul(Transpose(tmpMat1),tmpMat1),header='Orthonormality Check')
+!
+!     Project the MW Hessian into the sub-space orthogonal to the constrained
+!     sub-space. Then, diagonalize the new matrix and report eigenvalues.
+!
+      nVib = nAt3-3-nRot
+      Allocate(tmpMat2(nVib,nVib),tmpMat3(nVib,nVib))
+      hMatMW = hMat
+      call massWeighMatrix(.false.,atomicMasses,hMatMW)
+      hMatMW = hMatMW*scaleHess
+      call mqc_print(iOut,hMatMW,header='hMatMW before projection...')
+      tmpMat2 = MatMul(  &
+        MatMul(Transpose(tmpMat1(:,3+nRot+1:nAt3)),hMatMW),  &
+        tmpMat1(:,3+nRot+1:nAt3))
+      call mqc_print(iOut,tmpMat2,header='tmpMat2')
+      write(iOut,*)
+      goto 999
+      hEVals = float(0)
+      call mySVD(iOut,nVib,tmpMat2,hEVals(1:nVib),tmpMat3)
+      call mqc_print(IOut,hEVals,header='EVals after sub-hMatMW SVD')
+      hEVals = hEVals*scale2wavenumber
+      hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
       call mqc_print(IOut,hEVals,header='MW Eigenvalues (cm-1)')
+      goto 999
 !
+!     Apply the projector to the MW Hessian and diagonalize again.
+!
+      write(iOut,*)' Hrant - NEW CODE...'
+      hMatMW = hMat
+      call massWeighMatrix(.false.,atomicMasses,hMatMW)
+      hMatMW = MatMul(MatMul(hMatProjector,hMatMW),hMatProjector)
+!hph      hMatMW = MatMul(hMatProjector,hMatMW)
+      hMatMW = hMatMW*scaleHess
+      call mqc_print(IOut,hMatMW,header='Projected MW Hessian after scaleHess')
+      call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
+      call mqc_print(IOut,hEVals,header='EVals after hMatMW SVD')
+      hEVals = hEVals*scale2wavenumber
+      hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
+      call mqc_print(IOut,hEVals,header='MW Eigenvalues (cm-1)')
+      call mqc_print(IOut,hEVecs,header='MW Left Eigenvectors')
+      goto 999
+
+!
+!     Un-mass-weigh the eigenvectors and re-print them. Then, write out the
+!     eigenvalues converted to wavenumbers.
+!
+      do i = 1,NAt3
+        call massWeighVector(.false.,atomicMasses,hEVecs(:,i))
+      endDo
+      call mqc_print(IOut,hEVecs,header='Un-MW Left Eigenvectors')
+      call mqc_print(iOut,hEVals*scale2wavenumber,header='Eigenvalues (cm-1)')
+
+
+
+
+!
+  999 Continue
+      write(iOut,*)' END OF VIBANALYSIS'
       end program VibAnalysis
