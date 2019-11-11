@@ -12,13 +12,13 @@ RunF         = pgfortran -i8 -r8 -Mallocatable=03
 #
 # The 'all' rule.
 #
-all: vibAnalysis.exe
+all: unitTest.exe vibAnalysis.exe
 
 #
 # Generic rules for building module (*.mod) and object (*.o) files.
 #
-#%.mod: %.f90
-#	$(RunF) -c $*.f90
+%.mod: %.f03
+	$(RunF) -c $*.f03
 
 %.o: %.f90
 	$(RunF) -I$(MQCMODS) -c $*.f90
@@ -33,5 +33,5 @@ all: vibAnalysis.exe
 #hph%.exe: %.f90
 	$(RunF) $(LIBS) -o $*.exe $*.f90
 
-%.exe: %.f03 $(MQCLIB)/libmqc.a
+%.exe: %.f03 vibAnalysisMod.mod $(MQCLIB)/libmqc.a
 	$(RunF) $(LIBS) $(Prof) -I$(MQCMODS) -o $*.exe $*.f03 $(MQCLIB)/libmqc.a
