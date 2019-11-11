@@ -1,0 +1,19 @@
+%chk=test005
+#p test hf opt
+symm=saveOrientation
+
+This job should optimize to a TS.
+
+0  1
+o   0.0   0.0   0.0
+h   0.0   0.0  -1.0
+h   0.0   0.0   1.0
+
+--link1--
+%chk=test005
+!%subst l716 l716
+#p test m11 int=grid=sg1 geom=allcheck guess=read freq output=mat
+symm=saveOrientation
+
+test005.mat
+

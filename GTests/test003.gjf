@@ -1,5 +1,6 @@
 %chk=test003
 #p test hf opt
+symm=saveOrientation
 
 test
 
@@ -11,6 +12,7 @@ h  1  1.0
 %chk=test003
 %subst l716 l716
 #p test geom=allcheck guess=read chkmth chkbas freq output=mat
+symm=saveOrientation
 
 test003.mat
 

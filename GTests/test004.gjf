@@ -1,0 +1,20 @@
+%chk=test004
+#p test m11 int=grid=sg1 opt=loose
+symm=saveOrientation
+
+This job is designed to have a fair amount of rotational contamination of the
+vibrational frequencies so we can test out the projection code.
+
+0  1
+o
+h  1  1.0
+h  1  1.0  2  90.0
+
+--link1--
+%chk=test004
+!%subst l716 l716
+#p test m11 int=grid=sg1 geom=allcheck guess=read freq output=mat
+symm=saveOrientation
+
+test004.mat
+

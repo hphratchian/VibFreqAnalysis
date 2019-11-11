@@ -1,5 +1,6 @@
 %chk=test001
 #p test hf geom=modela opt
+symm=saveOrientation
 
 test
 
@@ -9,6 +10,7 @@ c oh h h me
 --link1--
 %chk=test001
 #p test geom=allcheck guess=read chkmth chkbas freq output=mat
+symm=saveOrientation
 
 test001.mat
 

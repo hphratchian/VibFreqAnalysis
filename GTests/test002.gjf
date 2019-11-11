@@ -1,5 +1,6 @@
 %chk=test002
 #p test hf opt
+symm=saveOrientation
 
 test
 
@@ -10,6 +11,7 @@ h(iso=1.0)  1  1.0
 --link1--
 %chk=test002
 #p test geom=allcheck guess=read chkmth chkbas freq output=mat
+symm=saveOrientation
 
 test002.mat
 
