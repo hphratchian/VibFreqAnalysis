@@ -1,3 +1,5 @@
+INCLUDE 'vibAnalysisMod.f03'
+
       Program unitTest
 !
 !     This program is a unit test program for various sub-programs being written

@@ -1,4 +1,4 @@
-      Module VibAnalysisMod
+      Module VibAnalysisMod123
       use mqc_general
       use iso_fortran_env
 !
@@ -333,9 +333,9 @@
       end subroutine momentsOfInertia
 
 
-      End Module VibAnalysisMod
+      End Module VibAnalysisMod123
 
-
+INCLUDE 'vibAnalysisMod.f03'
 
 
       Program VibAnalysis

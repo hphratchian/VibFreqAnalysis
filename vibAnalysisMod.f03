@@ -195,9 +195,9 @@
         write(iOut,*)
         write(iOut,*)' i = ',i
         write(iOut,*)'   eVal from SVD:            ',eVals(i)
-        call mqc_vectorPhase(rightEVecs(:,i),.TRUE.)
-        work = MatMul(A,rightEVecs(:,i))
-        eVals(i) = dot_product(rightEVecs(:,i),work)
+        call mqc_vectorPhase(EVecs(:,i),.TRUE.)
+        work = MatMul(A,EVecs(:,i))
+        eVals(i) = dot_product(EVecs(:,i),work)
         write(iOut,*)'   eVal after re-evaluation: ',eVals(i)
       endDo
       write(iOut,*)
@@ -206,6 +206,7 @@
       write(iOut,*)
       write(iOut,*)
 
+      call mqc_print(IOut,EVecs,header='mySVD: Left Eigenvectors')
       call mqc_print(IOut,rightEVecs,header='mySVD: Right Eigenvectors')
       end subroutine mySVD
 

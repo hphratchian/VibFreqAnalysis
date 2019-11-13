@@ -18,7 +18,7 @@ all: unitTest.exe vibAnalysis.exe
 # Generic rules for building module (*.mod) and object (*.o) files.
 #
 %.mod: %.f03
-	$(RunF) -c $*.f03
+	$(RunF) $(LIBS) $(Prof) -I$(MQCMODS) -c $*.f03
 
 %.o: %.f90
 	$(RunF) -I$(MQCMODS) -c $*.f90
@@ -33,5 +33,5 @@ all: unitTest.exe vibAnalysis.exe
 #hph%.exe: %.f90
 	$(RunF) $(LIBS) -o $*.exe $*.f90
 
-%.exe: %.f03 vibAnalysisMod.mod $(MQCLIB)/libmqc.a
+%.exe: %.f03 vibAnalysisMod.f03 $(MQCLIB)/libmqc.a
 	$(RunF) $(LIBS) $(Prof) -I$(MQCMODS) -o $*.exe $*.f03 $(MQCLIB)/libmqc.a
