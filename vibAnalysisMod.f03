@@ -186,23 +186,29 @@
 !
       integer(kind=int64)::i,iError,lenWork
       real(kind=real64),dimension(:),allocatable::work
-      real(kind=real64),dimension(n,n)::copyA,rightEVecs
+      real(kind=real64),dimension(n,n)::copyA,leftEVecs,rightEVecs
 !
 !
       copyA = A
       Allocate(work(1))
       lenWork = -1
       iError = 0
-      Call DGESVD('A','A',n,n,copyA,n,eVals,eVecs,n,rightEVecs,n,work,  &
+      Call DGESVD('A','A',n,n,copyA,n,eVals,leftEVecs,n,rightEVecs,n,work,  &
         lenWork,iError)
       lenWork = INT(work(1))
       DeAllocate(work)
       write(IOut,*)' Hrant - lenWork is calculated to be ',lenWork
       Allocate(work(lenWork))
-      Call DGESVD('A','A',n,n,copyA,n,eVals,eVecs,n,rightEVecs,n,work,  &
+      Call DGESVD('A','A',n,n,copyA,n,eVals,leftEVecs,n,rightEVecs,n,work,  &
         lenWork,iError)
       DeAllocate(work)
       write(IOut,*)' Hrant - iError = ',iError
+!
+!     Resort the eigenvectors...
+!
+      do i = 0,n-1
+        EVecs(:,i+1) = leftEVecs(:,n-i)
+      endDo
 !
 !     Go through all the eigenvectors and determine eigenvalues and fix the
 !     phase of each vector so that the largest magnitude element is positive.
@@ -314,6 +320,19 @@
 !
 !     Build the three (or two) overall-rotational vectors and determine nRot.
 !
+
+!hph+
+!      1 ==> 1,1
+!      2 ==> 2,1
+!      3 ==> 3,1
+!      4 ==> 1,2
+!      5 ==> 2,2
+!      6 ==> 3,2
+!      7 ==> 1,3
+!      8 ==> 2,3
+!      9 ==> 3,3
+!hph-
+
       nRot = 0
       do i = 1,3
         if(ABS(inertiaEVals(i)).gt.Small) nRot = nRot+1
@@ -327,14 +346,33 @@
           cartesiansCOM(iCartOff+3)*inertiaEVecs(3,1)
         cartYP = cartesiansCOM(iCartOff+1)*inertiaEVecs(1,2) +  &
           cartesiansCOM(iCartOff+2)*inertiaEVecs(2,2) +  &
-          cartesiansCOM(iCartOff+3)*inertiaEVecs(2,3)
+          cartesiansCOM(iCartOff+3)*inertiaEVecs(3,2)
         cartZP = cartesiansCOM(iCartOff+1)*inertiaEVecs(1,3) +  &
           cartesiansCOM(iCartOff+2)*inertiaEVecs(2,3) +  &
           cartesiansCOM(iCartOff+3)*inertiaEVecs(3,3)
+
+!hph+
+      write(iOut,*)
+      write(iOut,*)' j = ',j
+      write(iOut,*)'   CX = ',cartesiansCOM(iCartOff+1)
+      write(iOut,*)'   CY = ',cartesiansCOM(iCartOff+2)
+      write(iOut,*)'   CZ = ',cartesiansCOM(iCartOff+3)
+      write(iOut,*)'   ----------------------------------------'
+      write(iOut,*)'   inertiaEVect(1,1) = ',inertiaEVecs(1,1)
+      write(iOut,*)'   inertiaEVecs(2,1) = ',inertiaEVecs(2,1)
+      write(iOut,*)'   inertiaEVecs(3,1) = ',inertiaEVecs(3,1)
+      write(iOut,*)'   ----------------------------------------'
+      write(iOut,*)' iCartOff = ',iCartOff
+      write(iOut,*)'   cartXP = ',cartXP
+      write(iOut,*)'   cartYP = ',cartYP
+      write(iOut,*)'   cartZP = ',cartZP
+      write(iOut,*)'   ----------------------------------------'
+      write(iOut,*)
+!hph-
+
         RotVecs(iCartOff+1,1) = cartYP*inertiaEVecs(1,3)-cartZP*inertiaEVecs(1,2)
         RotVecs(iCartOff+2,1) = cartYP*inertiaEVecs(2,3)-cartZP*inertiaEVecs(2,2)
         RotVecs(iCartOff+3,1) = cartYP*inertiaEVecs(3,3)-cartZP*inertiaEVecs(3,2)
-
         RotVecs(iCartOff+1,2) = cartZP*inertiaEVecs(1,1)-cartXP*inertiaEVecs(1,3)
         RotVecs(iCartOff+2,2) = cartZP*inertiaEVecs(2,1)-cartXP*inertiaEVecs(2,3)
         RotVecs(iCartOff+3,2) = cartZP*inertiaEVecs(3,1)-cartXP*inertiaEVecs(3,3)

@@ -265,13 +265,13 @@ INCLUDE 'vibAnalysisMod.f03'
       call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
       write(iOut,*)
       write(iOut,*)
-      call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,nAt3-5:nAt3)),header='Overlaps of v and last eVecs')
+      i = 3+nRot
+      call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,1:i)),header='Overlaps of v and first eVecs')
       call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hMatProjectorVectors),header='Overlaps of v and v')
-      nVib = nAt3-3-nRot
-      call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,1:nVib)),header='Overlaps of v and normal modes')
+      call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,i+1:)),header='Overlaps of v and normal modes')
       write(iOut,*)
       write(iOut,*)
-      call mqc_error('STOP 2')
+!hph      call mqc_error('STOP 2')
       
       call mqc_print(IOut,hEVals,header='EVals after hMatMW SVD')
       hEVals = hEVals*scale2wavenumber
