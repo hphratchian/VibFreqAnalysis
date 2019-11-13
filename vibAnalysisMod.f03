@@ -57,6 +57,28 @@
       end subroutine orthogonalizeVector
 
 !
+!     PROCEDURE vecMatVec
+!
+      function VecMatVec(vector,matrix) result(outVal)
+      implicit none
+      real(kind=real64),dimension(:),intent(in)::vector
+      real(kind=real64),dimension(:,:),intent(in)::matrix
+      real(kind=real64),intent(out)::outVal
+      real(kind=real64),dimension(:),allocatable::tmpVector
+      integer(kind=int64)::i,j,nDim,nDim1,nDim2
+!
+      nDim  = Size(vector)
+      nDim1 = Size(matrix,1)
+      nDim2 = Size(matrix,2)
+      if(nDim.ne.nDim1.or.nDim1.ne.nDim2) call mqc_error('VecMatVec: Problem with nDims.')
+      Allocate(tmpVector(nDim))
+      tmpVector = MatMul(matrix,vector)
+      outVal = dot_product(vector,tmpVector)
+!
+      return
+      end function VecMatVec
+
+!
 !     PROCEDURE OuterProduct
 !
       function outerProduct(v1,v2) result(outMat)

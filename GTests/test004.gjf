@@ -12,7 +12,7 @@ h  1  1.0  2  90.0
 
 --link1--
 %chk=test004
-!%subst l716 l716
+%subst l716 l716
 #p test m11 int=grid=sg1 geom=allcheck guess=read freq output=mat
 symm=saveOrientation
 
