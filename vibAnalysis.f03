@@ -30,8 +30,8 @@ INCLUDE 'vibAnalysisMod.f03'
       real(kind=real64),dimension(:,:),allocatable::hMat,hEVecs,hMatMW,  &
         hMatProjectorVectors,hMatProjector,RotVecs,tmpMat1,tmpMat2,  &
         tmpMat3
-      character(len=512)::matrixFilename
-      logical::extraPrint=.false.
+      character(len=512)::matrixFilename,tmpString
+      logical::extraPrint=.false.,constrainTranslation,constrainRotation
       type(mqc_gaussian_unformatted_matrix_file)::GMatrixFile
       type(MQC_Variable)::forceConstants
 !
@@ -40,6 +40,7 @@ INCLUDE 'vibAnalysisMod.f03'
  1000 Format(1x,'Enter VibAnalysis.')
  1010 Format(3x,'Matrix File: ',A,/)
  1100 Format(1x,'nAtoms=',I4)
+ 1200 Format(1x,'Freezing atom number ',I4)
  2100 Format(1x,'number of rotational DOFs: ',I1)
 !
 !
@@ -48,7 +49,8 @@ INCLUDE 'vibAnalysisMod.f03'
 !     Open the Gaussian matrix file and load the number of atomic centers.
 
       nCommands = command_argument_count()
-      if(nCommands.eq.0) call mqc_error('No command line arguments provided. The input Gaussian matrix file name is required.')
+      if(nCommands.eq.0)  &
+        call mqc_error('No command line arguments provided. The input Gaussian matrix file name is required.')
       call get_command_argument(1,matrixFilename)
       call GMatrixFile%load(matrixFilename)
       write(IOut,1010) TRIM(matrixFilename)
@@ -64,12 +66,17 @@ INCLUDE 'vibAnalysisMod.f03'
 !     Set frozenAtoms to 0's and 1's. A value of frozenAtoms(i)=1 indicates atom
 !     i is frozen.
 !
-      frozenAtoms = 0
-      do i = 1,nCommands-1
-
-
-
-
+      frozenAtoms  = 0
+      nFrozenAtoms = 0
+      do i = 2,nCommands
+        call get_command_argument(i,tmpString)
+        read(tmpString,'(I)') j
+        if(j.le.0.or.j.gt.nAtoms) call mqc_error('Invalid atom number given in frozen atom list.')
+        frozenAtoms(j) = 1
+        nFrozenAtoms = nFrozenAtoms+1
+      endDo
+      if(extraPrint.or.nFrozenAtoms.gt.0)  &
+        call mqc_print(iOut,frozenAtoms,header='frozenAtoms list')
 !
 !     Load the Cartesian coordinates.
 !
@@ -106,7 +113,16 @@ INCLUDE 'vibAnalysisMod.f03'
 !     Determine the number of constraints, allocate space for the projector
 !     vectors, and initialize them.
 !
-      nConstraints = 6
+      select case(nFrozenAtoms)
+      case(0)
+        nConstraints = 6
+        constrainTranslation = .True.
+        constrainRotation = .True.
+      case(1)
+      case(2:)
+      case default
+
+      end select
       Allocate(hMatProjectorVectors(nAt3,nConstraints))
       hMatProjectorVectors = float(0)
 !
