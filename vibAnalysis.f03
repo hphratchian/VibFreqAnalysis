@@ -21,7 +21,7 @@ INCLUDE 'vibAnalysisMod.f03'
       implicit none
       integer(kind=int64),parameter::IOut=6
       integer(kind=int64)::nCommands,i,j,nAtoms,nAt3,nRot,  &
-        nConstraints,nVib
+        nConstraints,nVib,iCurrentProjector
       integer(kind=int64),dimension(:),allocatable::frozenAtoms
       real(kind=real64),parameter::scaleHess=548.5799089940967d0,  &
         scale2wavenumber = 48169.11381488435d0
@@ -119,30 +119,39 @@ INCLUDE 'vibAnalysisMod.f03'
         constrainTranslation = .True.
         constrainRotation = .True.
       case(1)
+        nConstraints = nFrozenAtoms*3 + 3
+        constrainTranslation = .False.
+        constrainRotation = .True.
       case(2:)
+        nConstraints = nFrozenAtoms*3
+        constrainTranslation = .False.
+        constrainRotation = .False.
       case default
-
+        call mqc_error('Determination of constraints is confused.')
       end select
       Allocate(hMatProjectorVectors(nAt3,nConstraints))
       hMatProjectorVectors = float(0)
+      iCurrentProjector = 1
 !
-!     Now, build up a projector to remove possible contamination from overall
-!     translational degrees of freedom.
+!     Now, build projectors to remove overall translational degrees of freedom.
 !
-      if(Allocated(tmpVec)) deAllocate(tmpVec)
-      Allocate(tmpVec(nAt3))
-      do i = 1,3
-        tmpVec = float(0)
-        do j = 0,nAtoms-1
-          tmpVec(3*j+i) = float(1)
+      if(constrainTranslation) then
+        if(Allocated(tmpVec)) deAllocate(tmpVec)
+        Allocate(tmpVec(nAt3))
+        do i = 1,3
+          tmpVec = float(0)
+          do j = 0,nAtoms-1
+            tmpVec(3*j+i) = float(1)
+          endDo
+          call massWeighVector(.true.,atomicMasses,tmpVec)
+          call mqc_normalizeVector(tmpVec)
+          hMatProjectorVectors(:,iCurrentProjector) = tmpVec
+          iCurrentProjector = iCurrentProjector+1
         endDo
-        call massWeighVector(.true.,atomicMasses,tmpVec)
-        call mqc_normalizeVector(tmpVec)
-        hMatProjectorVectors(:,i) = tmpVec
-      endDo
-      deAllocate(tmpVec)
-      if(extraPrint)  &
-        call mqc_print(IOut,hMatProjectorVectors(:,1:3),header='MW translational projection vector.')
+        deAllocate(tmpVec)
+        if(extraPrint)  &
+          call mqc_print(IOut,hMatProjectorVectors(:,1:3),header='MW translational projection vector.')
+      endIf
 !
 !     Determine the moments of inertia and principle axes of rotation. Then,
 !     build the rotational constaint vectors. As appropriate to the job, add
