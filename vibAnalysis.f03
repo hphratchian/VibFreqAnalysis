@@ -20,7 +20,9 @@ INCLUDE 'vibAnalysisMod.f03'
 !
       implicit none
       integer(kind=int64),parameter::IOut=6
-      integer(kind=int64)::i,j,nAtoms,nAt3,nRot,nVib
+      integer(kind=int64)::nCommands,i,j,nAtoms,nAt3,nRot,  &
+        nConstraints,nVib
+      integer(kind=int64),dimension(:),allocatable::frozenAtoms
       real(kind=real64),parameter::scaleHess=548.5799089940967d0,  &
         scale2wavenumber = 48169.11381488435d0
       real(kind=real64),dimension(:),allocatable::cartesians,  &
@@ -43,19 +45,31 @@ INCLUDE 'vibAnalysisMod.f03'
 !
       write(IOut,1000)
 !
-!     Open the Gaussian matrix file and load the number of alpha electrons
-!     (nAlpha), number of beta electrons (nBeta), and number of MOs (nBasis).
-!
+!     Open the Gaussian matrix file and load the number of atomic centers.
+
+      nCommands = command_argument_count()
+      if(nCommands.eq.0) call mqc_error('No command line arguments provided. The input Gaussian matrix file name is required.')
       call get_command_argument(1,matrixFilename)
       call GMatrixFile%load(matrixFilename)
       write(IOut,1010) TRIM(matrixFilename)
       nAtoms = GMatrixFile%getVal('nAtoms')
       write(IOut,1100) nAtoms
 !
-!     Figure out nAt3, then allocate memory for intrinsic arrays.
+!     Figure out nAt3, then allocate memory for key arrays.
 !
       nAt3 = 3*nAtoms
-      Allocate(hEVecs(nAt3,nAt3),hEVals(nAt3),hMatMW(NAt3,NAt3))
+      Allocate(frozenAtoms(nAtoms),hEVecs(nAt3,nAt3),hEVals(nAt3),  &
+        hMatMW(NAt3,NAt3))
+!
+!     Set frozenAtoms to 0's and 1's. A value of frozenAtoms(i)=1 indicates atom
+!     i is frozen.
+!
+      frozenAtoms = 0
+      do i = 1,nCommands-1
+
+
+
+
 !
 !     Load the Cartesian coordinates.
 !
@@ -89,9 +103,11 @@ INCLUDE 'vibAnalysisMod.f03'
       hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
       call mqc_print(IOut,hEVals,header='Initial MW Eigenvalues (cm-1)')
 !
-!     Allocate space for the projector vectors and initialize them.
+!     Determine the number of constraints, allocate space for the projector
+!     vectors, and initialize them.
 !
-      Allocate(hMatProjectorVectors(nAt3,6))
+      nConstraints = 6
+      Allocate(hMatProjectorVectors(nAt3,nConstraints))
       hMatProjectorVectors = float(0)
 !
 !     Now, build up a projector to remove possible contamination from overall
@@ -108,6 +124,7 @@ INCLUDE 'vibAnalysisMod.f03'
         call mqc_normalizeVector(tmpVec)
         hMatProjectorVectors(:,i) = tmpVec
       endDo
+      deAllocate(tmpVec)
       if(extraPrint)  &
         call mqc_print(IOut,hMatProjectorVectors(:,1:3),header='MW translational projection vector.')
 !
@@ -168,7 +185,7 @@ INCLUDE 'vibAnalysisMod.f03'
       call mqc_print(IOut,hEVals,header='EVals after hMatMW SVD')
 
 !hph+
-      call mqc_error('STOP 3')
+!      call mqc_error('STOP 3')
 !hph-
 
       hEVals = hEVals*scale2wavenumber
@@ -183,6 +200,7 @@ INCLUDE 'vibAnalysisMod.f03'
 !
       do i = 1,NAt3
         call massWeighVector(.false.,atomicMasses,hEVecs(:,i))
+        call mqc_normalizeVector(hEVecs(:,i))
       endDo
       call mqc_print(IOut,hEVecs,header='Un-MW Left Eigenvectors')
       call mqc_print(iOut,hEVals,header='Eigenvalues (cm-1)')
