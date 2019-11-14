@@ -1,5 +1,4 @@
 INCLUDE 'vibAnalysisMod.f03'
-
       Program VibAnalysis
 !
 !     This program carries out a vibrational analysis using force constants
@@ -39,6 +38,7 @@ INCLUDE 'vibAnalysisMod.f03'
  1000 Format(1x,'Enter VibAnalysis.')
  1010 Format(3x,'Matrix File: ',A,/)
  1100 Format(1x,'nAtoms=',I4)
+ 2100 Format(1x,'number of rotational DOFs: ',I1)
 !
 !
       write(IOut,1000)
@@ -77,19 +77,17 @@ INCLUDE 'vibAnalysisMod.f03'
       call mqc_print(iout,atomicMasses,header='Atomic Masses')
       hMatMW = hMat
       call massWeighMatrix(.false.,atomicMasses,hMatMW)
-      call mqc_print(IOut,hMatMW,header='Hessian-FULL after MW''ing')
+      if(extraPrint) call mqc_print(IOut,hMatMW,header='Hessian-FULL after MW''ing')
       hMatMW = hMatMW*scaleHess
-      call mqc_print(IOut,hMatMW,header='Hessian-FULL after scaleHess')
+      if(extraPrint) call mqc_print(IOut,hMatMW,header='Hessian-FULL after scaleHess')
 !
 !     Diagonalize the mass-weighted hessian. This is done prior to projection of
 !     translation/rotation/frozen-atom constrains.
 !
       call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
-      call mqc_print(IOut,hEVals,header='MW Eigenvalues')
-      call mqc_print(IOut,hEVecs,header='MW Left Eigenvectors')
       hEVals = hEVals*scale2wavenumber
       hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
-      call mqc_print(IOut,hEVals,header='MW Eigenvalues (cm-1)')
+      call mqc_print(IOut,hEVals,header='Initial MW Eigenvalues (cm-1)')
 !
 !     Allocate space for the projector vectors and initialize them.
 !
@@ -110,27 +108,27 @@ INCLUDE 'vibAnalysisMod.f03'
         call mqc_normalizeVector(tmpVec)
         hMatProjectorVectors(:,i) = tmpVec
       endDo
-      call mqc_print(IOut,hMatProjectorVectors(:,1:3),header='MW translational projection vector.')
+      if(extraPrint)  &
+        call mqc_print(IOut,hMatProjectorVectors(:,1:3),header='MW translational projection vector.')
 !
-!     Determine the moments of inertia and principle axes of rotation.
+!     Determine the moments of inertia and principle axes of rotation. Then,
+!     build the rotational constaint vectors. As appropriate to the job, add
+!     them to hMatProjectorVectors.
 !
-      write(IOut,*)
-      write(iOut,*)
-      write(iOut,*)' Calling MoI Routine...'
       Allocate(RotVecs(nAt3,3))
       call momentsOfInertia(iOut,nAtoms,cartesians,atomicMasses,nRot,RotVecs)
-      write(iOUt,*)' After momentsOfIneria: nRot=',nRot
-      call mqc_print(iOut,RotVecs,header='RotVecs')
       call mqc_normalizeVector(RotVecs(:,1))
       call mqc_normalizeVector(RotVecs(:,2))
       call mqc_normalizeVector(RotVecs(:,3))
-      call mqc_print(iOut,RotVecs,header='RotVecs after normalization')
+      if(extraPrint) then
+        write(iOut,2100) nRot
+        call mqc_print(iOut,RotVecs,header='(Normalized) Rotational Constraint Vectors')
+      endIf
       hMatProjectorVectors(:,4) = RotVecs(:,1)
       hMatProjectorVectors(:,5) = RotVecs(:,2)
       hMatProjectorVectors(:,6) = RotVecs(:,3)
 !
-!     If DoProjector is TRUE, build a projector based on hMatProjectorVectors
-!     and carry out diagonalization of the resulting matrix.
+!     Build the projector based on hMatProjectorVectors.
 !
       Allocate(hMatProjector(nAt3,nAt3))
       call mqc_print(iOut,hMatProjectorVectors,header='Projection Vectors')
@@ -138,112 +136,6 @@ INCLUDE 'vibAnalysisMod.f03'
       call mqc_print(iOut,hMatProjector,header='Projection Matrix -- Version 0')
       hMatProjector = unitMatrix(nAt3) - hMatProjector
       call mqc_print(iOut,hMatProjector,header='Projection Matrix -- FINAL')
-
-!hph+
-!      write(iOut,*)
-!      write(iOut,*)' Hrant - Here''s the first way of building the projector...'
-!      hMatProjector = float(0)
-!      do i = 1,6
-!        hMatProjector = hMatProjector +  &
-!          outerProduct(hMatProjectorVectors(:,i),hMatProjectorVectors(:,i))
-!!        hMatProjector =   &
-!!          outerProduct(hMatProjectorVectors(:,i),hMatProjectorVectors(:,i))
-!        write(iOut,*)' Projector ',i,'...'
-!        call mqc_print(iOut,hMatProjector,header='     Current Projection Matrix')
-!      endDo
-!      write(iOut,*)
-!      write(iOut,*)
-!      write(iOut,*)
-!!hph      hMatProjector = unitMatrix(nAt3) - hMatProjector
-!      call mqc_print(iOut,hMatProjector,header='FINAL Projection Matrix -- Version 1')
-!
-!      hMatProjector = MatMul(hMatProjectorVectors,Transpose(hMatProjectorVectors))
-!      call mqc_print(iOut,hMatProjector,header='FINAL Projection Matrix -- Version 2')
-!hph-
-
-!hph+
-!      hMatProjector = unitMatrix(nAt3) -  &
-!        MatMul(hMatProjectorVectors(:,1:5),Transpose(hMatProjectorVectors(:,1:5)))
-!      call mqc_print(IOut,hMatProjector,header='Final Hessian Projector, hMatProjector')
-!      hMatProjector = float(0)
-!      do i = 1,6
-!        hMatProjector = hMatProjector +  &
-!          outerProduct(hMatProjectorVectors(:,1),hMatProjectorVectors(:,1))
-!      endDo
-!      hMatProjector = unitMatrix(nAt3) - hMatProjector
-!      call mqc_print(iOut,hMatProjector,header='hMatProjector, again...')
-!hph-
-
-!hph      goto 999
-      goto 800
-
-!
-!     Build the projection matrix into tmpMat1.
-!
-      Allocate(tmpMat1(nAt3,nAt3))
-      tmpMat1 = float(0)
-      tmpMat1(:,1:3+nRot) = hMatProjectorVectors
-      write(iOut,*)
-      write(iOut,*)
-      call mqc_print(iOut,tmpMat1,header='tmpMat1 before Gram-Schmidt...')
-      do i = nRot+4,NAt3
-        write(IOut,*)
-        write(iOUt,*)
-        write(IOut,*)' Hrant'
-        write(iOut,*)' Orthogonalizing vector i=',i
-        tmpMat1(i,i) = float(1)
-        if(i.eq.(nRot+4)) then
-          tmpMat1(:,i) = float(0)
-          tmpMat1(2,i) =  0.256965
-          tmpMat1(5,i) = -0.511850
-          tmpMat1(6,i) =  0.452762
-          tmpMat1(8,i) = -0.511850
-          tmpMat1(9,i) = -0.452762
-        endIf
-        call orthogonalizeVector(i-1,tmpMat1(:,1:i-1),tmpMat1(:,i))
-        call mqc_print(iOut,tmpMat1,header='tmpMat1')
-      endDo
-      write(iOut,*)
-      write(iOut,*)
-      write(iOut,*)' Check of normalization of vector space...'
-      do i = 1,nAt3
-        write(iOut,*)' Hrant - i=',i,'   < i | i >=',dot_product(tmpMat1(:,i),tmpMat1(:,i))
-      endDo
-      call mqc_print(iOut,MatMul(Transpose(tmpMat1),tmpMat1),header='Orthonormality Check')
-
-
-  800 Continue
-
-!hph+
-!!
-!!     Project the MW Hessian into the sub-space orthogonal to the constrained
-!!     sub-space. Then, diagonalize the new matrix and report eigenvalues.
-!!
-!      nVib = nAt3-3-nRot
-!      Allocate(tmpMat2(nVib,nVib),tmpMat3(nVib,nVib))
-!
-!      hMatMW = hMat
-!      call massWeighMatrix(.false.,atomicMasses,hMatMW)
-!      hMatMW = hMatMW*scaleHess
-!      call mqc_print(iOut,hMatMW,header='hMatMW before projection...')
-!
-!      tmpMat2 = MatMul(  &
-!        MatMul(Transpose(tmpMat1(:,3+nRot+1:nAt3)),hMatMW),  &
-!        tmpMat1(:,3+nRot+1:nAt3))
-!
-!      tmpMat2 = MatMul(MatMul(hMatProjector,hMatMW),hMatProjector)
-!      call mqc_print(iOut,tmpMat2,header='tmpMat2')
-!      write(iOut,*)
-!
-!      hEVals = float(0)
-!      call mySVD(iOut,nVib,tmpMat2,hEVals(1:nVib),tmpMat3)
-!      call mqc_print(IOut,hEVals,header='EVals after sub-hMatMW SVD')
-!      hEVals = hEVals*scale2wavenumber
-!      hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
-!      call mqc_print(IOut,hEVals,header='MW Eigenvalues (cm-1)')
-!hph-
-
-
 !
 !     Apply the projector to the MW Hessian and diagonalize again.
 !
@@ -271,9 +163,14 @@ INCLUDE 'vibAnalysisMod.f03'
       call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,i+1:)),header='Overlaps of v and normal modes')
       write(iOut,*)
       write(iOut,*)
-!hph      call mqc_error('STOP 2')
       
+      call mqc_print(IOut,hEVecs,header='EVecs after hMatMW SVD')
       call mqc_print(IOut,hEVals,header='EVals after hMatMW SVD')
+
+!hph+
+      call mqc_error('STOP 3')
+!hph-
+
       hEVals = hEVals*scale2wavenumber
       hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
       if(extraPrint) then
