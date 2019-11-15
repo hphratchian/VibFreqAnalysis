@@ -141,10 +141,8 @@ INCLUDE 'vibAnalysisMod.f03'
           endDo
           call massWeighVector(.true.,atomicMasses,tmpVec)
           call mqc_normalizeVector(tmpVec)
-          if(iCurrentProjector.gt.nConstraints)  &
-            call mqc_error('Logic Error: vibAnalysis attempted to add more constraints than expected.')
-          hMatProjectorVectors(:,iCurrentProjector) = tmpVec
-          iCurrentProjector = iCurrentProjector+1
+          call addConstraintVector(iCurrentProjector,nConstraints,tmpVec,  &
+            hMatProjectorVectors)
         endDo
         deAllocate(tmpVec)
         if(extraPrint)  &
@@ -165,12 +163,12 @@ INCLUDE 'vibAnalysisMod.f03'
           write(iOut,2100) nRot
           call mqc_print(iOut,RotVecs,header='(Normalized) Rotational Constraint Vectors')
         endIf
-        hMatProjectorVectors(:,iCurrentProjector) = RotVecs(:,1)
-        iCurrentProjector = iCurrentProjector+1
-        hMatProjectorVectors(:,iCurrentProjector) = RotVecs(:,2)
-        iCurrentProjector = iCurrentProjector+1
-        hMatProjectorVectors(:,iCurrentProjector) = RotVecs(:,3)
-        iCurrentProjector = iCurrentProjector+1
+        call addConstraintVector(iCurrentProjector,nConstraints,RotVecs(:,1),  &
+          hMatProjectorVectors)
+        call addConstraintVector(iCurrentProjector,nConstraints,RotVecs(:,2),  &
+          hMatProjectorVectors)
+        call addConstraintVector(iCurrentProjector,nConstraints,RotVecs(:,3),  &
+          hMatProjectorVectors)
       endIf
 !
 !     Build the projector based on hMatProjectorVectors.
