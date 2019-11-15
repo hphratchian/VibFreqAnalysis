@@ -7,7 +7,7 @@
       real(kind=real64),parameter::bohr2ang=0.529177d0,  &
         scale2wavenumber=48169.11381488435d0,  &
         scaleHess=548.5799089940967d0
-      logical::extraPrint=.false.
+      logical::extraPrint=.False.
       CONTAINS
 !
 !
@@ -366,15 +366,9 @@
         RotVecs(iCartOff+1,2) = cartZP*inertiaEVecs(1,1)-cartXP*inertiaEVecs(1,3)
         RotVecs(iCartOff+2,2) = cartZP*inertiaEVecs(2,1)-cartXP*inertiaEVecs(2,3)
         RotVecs(iCartOff+3,2) = cartZP*inertiaEVecs(3,1)-cartXP*inertiaEVecs(3,3)
-        if(nRot.eq.3) then
-          RotVecs(iCartOff+1,3) = cartXP*inertiaEVecs(1,2)-cartYP*inertiaEVecs(1,1)
-          RotVecs(iCartOff+2,3) = cartXP*inertiaEVecs(2,2)-cartYP*inertiaEVecs(2,1)
-          RotVecs(iCartOff+3,3) = cartXP*inertiaEVecs(3,2)-cartYP*inertiaEVecs(3,1)
-        else
-          RotVecs(iCartOff+1,3) = float(0)
-          RotVecs(iCartOff+2,3) = float(0)
-          RotVecs(iCartOff+3,3) = float(0)
-        endIf
+        RotVecs(iCartOff+1,3) = cartXP*inertiaEVecs(1,2)-cartYP*inertiaEVecs(1,1)
+        RotVecs(iCartOff+2,3) = cartXP*inertiaEVecs(2,2)-cartYP*inertiaEVecs(2,1)
+        RotVecs(iCartOff+3,3) = cartXP*inertiaEVecs(3,2)-cartYP*inertiaEVecs(3,1)
       endDo
       call massWeighVector(.true.,atomicMasses,RotVecs(:,1))
       call massWeighVector(.true.,atomicMasses,RotVecs(:,2))
