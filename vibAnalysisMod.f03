@@ -7,6 +7,36 @@
       CONTAINS
 !
 !
+!     PROCEDURE addConstraintVector
+!
+      subroutine addConstraintVector(iCurrentProjector,nConstraints,  &
+        newVector,hMatProjectorVectors)
+!
+!     This subroutine adds the input vector newVector to the list of projectors
+!     stored in hMatProjectorVectors. The dummy argument iCurrentProjector
+!     should be initialized to zero before the first call to this routine. The
+!     value in iCurrentProjector is then updated here and should not be modified
+!     outside this routine. Dummy argument nConstraints is the number of
+!     expected total constraints.
+!
+      implicit none
+      integer(kind=int64),intent(inOut)::iCurrentProjector
+      integer(kind=int64),intent(in)::nConstraints
+      real(kind=real64),dimension(:),intent(in)::newVector
+      real(kind=real64),dimension(:,:),intent(inOut)::hMatProjectorVectors
+!
+!     Do the work...
+!
+      if(iCurrentProjector.gt.nConstraints)  &
+        call mqc_error('Logic Error: vibAnalysis attempted to add more constraints than expected.')
+      hMatProjectorVectors(:,iCurrentProjector) = newVector
+      iCurrentProjector = iCurrentProjector+1
+!
+      return
+      end subroutine addConstraintVector
+
+
+!
 !     PROCEDURE OrthogonalizeVector
 !
       subroutine orthogonalizeVector(nHave,vectorList,vector)
@@ -320,19 +350,6 @@
 !
 !     Build the three (or two) overall-rotational vectors and determine nRot.
 !
-
-!hph+
-!      1 ==> 1,1
-!      2 ==> 2,1
-!      3 ==> 3,1
-!      4 ==> 1,2
-!      5 ==> 2,2
-!      6 ==> 3,2
-!      7 ==> 1,3
-!      8 ==> 2,3
-!      9 ==> 3,3
-!hph-
-
       nRot = 0
       do i = 1,3
         if(ABS(inertiaEVals(i)).gt.Small) nRot = nRot+1
@@ -350,26 +367,6 @@
         cartZP = cartesiansCOM(iCartOff+1)*inertiaEVecs(1,3) +  &
           cartesiansCOM(iCartOff+2)*inertiaEVecs(2,3) +  &
           cartesiansCOM(iCartOff+3)*inertiaEVecs(3,3)
-
-!hph+
-      write(iOut,*)
-      write(iOut,*)' j = ',j
-      write(iOut,*)'   CX = ',cartesiansCOM(iCartOff+1)
-      write(iOut,*)'   CY = ',cartesiansCOM(iCartOff+2)
-      write(iOut,*)'   CZ = ',cartesiansCOM(iCartOff+3)
-      write(iOut,*)'   ----------------------------------------'
-      write(iOut,*)'   inertiaEVect(1,1) = ',inertiaEVecs(1,1)
-      write(iOut,*)'   inertiaEVecs(2,1) = ',inertiaEVecs(2,1)
-      write(iOut,*)'   inertiaEVecs(3,1) = ',inertiaEVecs(3,1)
-      write(iOut,*)'   ----------------------------------------'
-      write(iOut,*)' iCartOff = ',iCartOff
-      write(iOut,*)'   cartXP = ',cartXP
-      write(iOut,*)'   cartYP = ',cartYP
-      write(iOut,*)'   cartZP = ',cartZP
-      write(iOut,*)'   ----------------------------------------'
-      write(iOut,*)
-!hph-
-
         RotVecs(iCartOff+1,1) = cartYP*inertiaEVecs(1,3)-cartZP*inertiaEVecs(1,2)
         RotVecs(iCartOff+2,1) = cartYP*inertiaEVecs(2,3)-cartZP*inertiaEVecs(2,2)
         RotVecs(iCartOff+3,1) = cartYP*inertiaEVecs(3,3)-cartZP*inertiaEVecs(3,2)

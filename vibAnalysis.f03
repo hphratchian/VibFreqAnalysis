@@ -20,8 +20,8 @@ INCLUDE 'vibAnalysisMod.f03'
 !
       implicit none
       integer(kind=int64),parameter::IOut=6
-      integer(kind=int64)::nCommands,i,j,nAtoms,nAt3,nRot,  &
-        nConstraints,nVib,iCurrentProjector
+      integer(kind=int64)::nCommands,i,j,nAtoms,nAt3,nFrozenAtoms,  &
+        nRot,nConstraints,nVib,iCurrentProjector
       integer(kind=int64),dimension(:),allocatable::frozenAtoms
       real(kind=real64),parameter::scaleHess=548.5799089940967d0,  &
         scale2wavenumber = 48169.11381488435d0
@@ -145,6 +145,8 @@ INCLUDE 'vibAnalysisMod.f03'
           endDo
           call massWeighVector(.true.,atomicMasses,tmpVec)
           call mqc_normalizeVector(tmpVec)
+          if(iCurrentProjector.gt.nConstraints)  &
+            call mqc_error('Logic Error: vibAnalysis attempted to add more constraints than expected.')
           hMatProjectorVectors(:,iCurrentProjector) = tmpVec
           iCurrentProjector = iCurrentProjector+1
         endDo
@@ -157,18 +159,23 @@ INCLUDE 'vibAnalysisMod.f03'
 !     build the rotational constaint vectors. As appropriate to the job, add
 !     them to hMatProjectorVectors.
 !
-      Allocate(RotVecs(nAt3,3))
-      call momentsOfInertia(iOut,nAtoms,cartesians,atomicMasses,nRot,RotVecs)
-      call mqc_normalizeVector(RotVecs(:,1))
-      call mqc_normalizeVector(RotVecs(:,2))
-      call mqc_normalizeVector(RotVecs(:,3))
-      if(extraPrint) then
-        write(iOut,2100) nRot
-        call mqc_print(iOut,RotVecs,header='(Normalized) Rotational Constraint Vectors')
+      if(constrainRotation) then
+        Allocate(RotVecs(nAt3,3))
+        call momentsOfInertia(iOut,nAtoms,cartesians,atomicMasses,nRot,RotVecs)
+        call mqc_normalizeVector(RotVecs(:,1))
+        call mqc_normalizeVector(RotVecs(:,2))
+        call mqc_normalizeVector(RotVecs(:,3))
+        if(extraPrint) then
+          write(iOut,2100) nRot
+          call mqc_print(iOut,RotVecs,header='(Normalized) Rotational Constraint Vectors')
+        endIf
+        hMatProjectorVectors(:,iCurrentProjector) = RotVecs(:,1)
+        iCurrentProjector = iCurrentProjector+1
+        hMatProjectorVectors(:,iCurrentProjector) = RotVecs(:,2)
+        iCurrentProjector = iCurrentProjector+1
+        hMatProjectorVectors(:,iCurrentProjector) = RotVecs(:,3)
+        iCurrentProjector = iCurrentProjector+1
       endIf
-      hMatProjectorVectors(:,4) = RotVecs(:,1)
-      hMatProjectorVectors(:,5) = RotVecs(:,2)
-      hMatProjectorVectors(:,6) = RotVecs(:,3)
 !
 !     Build the projector based on hMatProjectorVectors.
 !
