@@ -19,7 +19,7 @@ INCLUDE 'vibAnalysisMod.f03'
 !     Variable Declarations
 !
       implicit none
-      integer(kind=int64)::nCommands,i,j,nAtoms,nAt3,nFrozenAtoms,  &
+      integer(kind=int64)::nCommands,i,j,k,nAtoms,nAt3,nFrozenAtoms,  &
         nRot,nConstraints,nVib,iCurrentProjector
       integer(kind=int64),dimension(:),allocatable::frozenAtoms
       real(kind=real64),dimension(:),allocatable::cartesians,  &
@@ -129,7 +129,30 @@ INCLUDE 'vibAnalysisMod.f03'
       hMatProjectorVectors = float(0)
       iCurrentProjector = 1
 !
-!     Now, build projectors to remove overall translational degrees of freedom.
+!     Build projectors that account for frozen atomic centers.
+!
+      if(nFrozenAtoms.gt.0) then
+        if(Allocated(tmpVec)) deAllocate(tmpVec)
+        Allocate(tmpVec(nAt3))
+        do i = 1,nAtoms
+          if(frozenAtoms(i).eq.1) then
+            do j = 1,3
+              tmpVec = float(0)
+              k = (i-1)*3+j
+              tmpVec(k) = float(1)
+              call massWeighVector(.true.,atomicMasses,tmpVec)
+              call mqc_normalizeVector(tmpVec)
+              call addConstraintVector(iCurrentProjector,nConstraints,  &
+                tmpVec,hMatProjectorVectors)
+            endDo
+          endIf
+        endDo
+        deAllocate(tmpVec)
+        if(extraPrint)  &
+          call mqc_print(IOut,hMatProjectorVectors,header='MW frozen atom constraints.')
+      endIf
+!
+!     Build projectors to remove overall translational degrees of freedom.
 !
       if(constrainTranslation) then
         if(Allocated(tmpVec)) deAllocate(tmpVec)
