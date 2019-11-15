@@ -3,7 +3,11 @@
       use iso_fortran_env
 !
       implicit none
-      real(kind=real64),parameter::bohr2ang=0.529177d0
+      integer(kind=int64),parameter::IOut=6
+      real(kind=real64),parameter::bohr2ang=0.529177d0,  &
+        scale2wavenumber=48169.11381488435d0,  &
+        scaleHess=548.5799089940967d0
+      logical::extraPrint=.false.
       CONTAINS
 !
 !
@@ -174,6 +178,7 @@
         endIf
       endDo
 !
+      return
       end subroutine massWeighVector
 
 !
@@ -202,6 +207,7 @@
         endDo
       endDo
 !
+      return
       end subroutine massWeighMatrix
 
 !
@@ -227,12 +233,10 @@
         lenWork,iError)
       lenWork = INT(work(1))
       DeAllocate(work)
-      write(IOut,*)' Hrant - lenWork is calculated to be ',lenWork
       Allocate(work(lenWork))
       Call DGESVD('A','A',n,n,copyA,n,eVals,leftEVecs,n,rightEVecs,n,work,  &
         lenWork,iError)
       DeAllocate(work)
-      write(IOut,*)' Hrant - iError = ',iError
 !
 !     Resort the eigenvectors...
 !
@@ -244,28 +248,18 @@
 !     phase of each vector so that the largest magnitude element is positive.
 !
       Allocate(work(n))
-      write(iOut,*)
-      write(iOut,*)
-      write(iOut,*)
-      write(iOut,*)' *******************************************'
-      write(iOut,*)
       do i = 1,n
-        write(iOut,*)
-        write(iOut,*)' i = ',i
-        write(iOut,*)'   eVal from SVD:            ',eVals(i)
         call mqc_vectorPhase(EVecs(:,i),.TRUE.)
         work = MatMul(A,EVecs(:,i))
         eVals(i) = dot_product(EVecs(:,i),work)
-        write(iOut,*)'   eVal after re-evaluation: ',eVals(i)
       endDo
-      write(iOut,*)
-      write(iOut,*)' *******************************************'
-      write(iOut,*)
-      write(iOut,*)
-      write(iOut,*)
-
-      call mqc_print(IOut,EVecs,header='mySVD: Left Eigenvectors')
-      call mqc_print(IOut,rightEVecs,header='mySVD: Right Eigenvectors')
+      if(extraPrint) then
+        call mqc_print(IOut,EVecs,header='mySVD: Left Eigenvectors')
+        call mqc_print(IOut,rightEVecs,header='mySVD: Right Eigenvectors')
+      endIf
+      DeAllocate(work)
+!
+      return
       end subroutine mySVD
 
 
@@ -290,10 +284,6 @@
 !
 !     Begin by finding the center of mass.
 !
-      write(IOut,*)
-      write(IOut,*)
-      write(IOut,*)
-      write(IOut,*)
       call mqc_print(iOut,cartesians,header='input cartesians (au)')
       totalMass = SUM(atomicMasses)
       centerOfMass = float(0)
@@ -306,17 +296,18 @@
       centerOfMass = centerOfMass/totalMass
       Allocate(cartesiansCOM(3*nAtoms))
       cartesiansCOM = float(0)
-      call mqc_print(iout,cartesians,header='before moving to COM, carts:')
+      if(extraPrint)  &
+        call mqc_print(iout,cartesians,header='before moving to COM, carts:')
       do i = 1,nAtoms
         iCartOff = (i-1)*3
-        write(iout,*)' Hrant - i       =',i
-        write(IOut,*)'         iCartOff=',iCartOff
         cartesiansCOM(iCartOff+1) = cartesians(iCartOff+1) - centerOfMass(1)
         cartesiansCOM(iCartOff+2) = cartesians(iCartOff+2) - centerOfMass(2)
         cartesiansCOM(iCartOff+3) = cartesians(iCartOff+3) - centerOfMass(3)
       endDo
-      call mqc_print(iOut,centerOfMass,header='COM (au)')
-      call mqc_print(iOut,cartesiansCOM,header='cartesiansCOM (au)')
+      if(extraPrint) then
+        call mqc_print(iOut,centerOfMass,header='COM (au)')
+        call mqc_print(iOut,cartesiansCOM,header='cartesiansCOM (au)')
+      endIf
 !
 !     Build the inertia matrix. Then, diagaonalize the matrix to solve for the
 !     principal moments and associated eigenvectors.
@@ -340,10 +331,12 @@
       inertiaMat(1,2) = inertiaMat(2,1)
       inertiaMat(1,3) = inertiaMat(3,1)
       inertiaMat(2,3) = inertiaMat(3,2)
-      call mqc_print(iout,inertiaMat,header='Inertia Matrix:')
       call mySVD(iOut,3,inertiaMat,inertiaEVals,inertiaEVecs)
-      call mqc_print(IOut,inertiaEVals,header='inertia Eigenvalues')
-      call mqc_print(IOut,inertiaEVecs,header='inertia Eigenvectors')
+      if(extraPrint) then
+        call mqc_print(iout,inertiaMat,header='Inertia Matrix:')
+        call mqc_print(IOut,inertiaEVals,header='inertia Eigenvalues')
+        call mqc_print(IOut,inertiaEVecs,header='inertia Eigenvectors')
+      endIf
       do i = 1,3
         if(ABS(inertiaEVals(i)).gt.Small) nRot = nRot+1
       endDo
@@ -386,8 +379,9 @@
       call massWeighVector(.true.,atomicMasses,RotVecs(:,1))
       call massWeighVector(.true.,atomicMasses,RotVecs(:,2))
       call massWeighVector(.true.,atomicMasses,RotVecs(:,3))
-      call mqc_print(iOut,RotVecs,header='Overall rotation vectors:')
+      if(extraPrint) call mqc_print(iOut,RotVecs,header='Overall rotation vectors:')
 !
+      return
       end subroutine momentsOfInertia
 
 

@@ -19,19 +19,16 @@ INCLUDE 'vibAnalysisMod.f03'
 !     Variable Declarations
 !
       implicit none
-      integer(kind=int64),parameter::IOut=6
       integer(kind=int64)::nCommands,i,j,nAtoms,nAt3,nFrozenAtoms,  &
         nRot,nConstraints,nVib,iCurrentProjector
       integer(kind=int64),dimension(:),allocatable::frozenAtoms
-      real(kind=real64),parameter::scaleHess=548.5799089940967d0,  &
-        scale2wavenumber = 48169.11381488435d0
       real(kind=real64),dimension(:),allocatable::cartesians,  &
         atomicMasses,hEVals,tmpVec
       real(kind=real64),dimension(:,:),allocatable::hMat,hEVecs,hMatMW,  &
         hMatProjectorVectors,hMatProjector,RotVecs,tmpMat1,tmpMat2,  &
         tmpMat3
       character(len=512)::matrixFilename,tmpString
-      logical::extraPrint=.false.,constrainTranslation,constrainRotation
+      logical::constrainTranslation,constrainRotation
       type(mqc_gaussian_unformatted_matrix_file)::GMatrixFile
       type(MQC_Variable)::forceConstants
 !
@@ -89,7 +86,6 @@ INCLUDE 'vibAnalysisMod.f03'
       call GMatrixFile%getArray('NUCLEAR FORCE CONSTANTS',mqcVarOut=forceConstants)
       call forceConstants%print(header='force constant matrix')
       hMat = forceConstants
-      call mqc_print(IOut,hMat,header='Hessian-FULL')
 !
 !     Get the atomic masses then mass-weigh the hessian..
 !
@@ -182,44 +178,26 @@ INCLUDE 'vibAnalysisMod.f03'
       Allocate(hMatProjector(nAt3,nAt3))
       call mqc_print(iOut,hMatProjectorVectors,header='Projection Vectors')
       hMatProjector = MatMul(hMatProjectorVectors,Transpose(hMatProjectorVectors))
-      call mqc_print(iOut,hMatProjector,header='Projection Matrix -- Version 0')
       hMatProjector = unitMatrix(nAt3) - hMatProjector
       call mqc_print(iOut,hMatProjector,header='Projection Matrix -- FINAL')
 !
 !     Apply the projector to the MW Hessian and diagonalize again.
 !
-      write(iOut,*)' Hrant - NEW CODE...'
       hMatMW = hMat
       call massWeighMatrix(.false.,atomicMasses,hMatMW)
       hMatMW = MatMul(MatMul(hMatProjector,hMatMW),hMatProjector)
       hMatMW = hMatMW*scaleHess
-      call mqc_print(IOut,hMatMW,header='Projected MW Hessian after scaleHess')
-      write(iOut,*)
-      write(iOut,*)
-      write(iOut,*)' Here are my <v|H|v> tests...'
-      do i = 1,6
-        write(iOut,*)' i = ',i
-        write(iOut,*)' <v|H|v> = ',VecMatVec(hMatProjectorVectors(:,i),hMatMW)
-      endDo
-      write(iOut,*)
-      write(iOut,*)
+      if(extraPrint)  &
+        call mqc_print(IOut,hMatMW,header='Projected MW Hessian after scaleHess')
       call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
-      write(iOut,*)
-      write(iOut,*)
       i = 3+nRot
-      call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,1:i)),header='Overlaps of v and first eVecs')
-      call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hMatProjectorVectors),header='Overlaps of v and v')
-      call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,i+1:)),header='Overlaps of v and normal modes')
-      write(iOut,*)
-      write(iOut,*)
-      
-      call mqc_print(IOut,hEVecs,header='EVecs after hMatMW SVD')
-      call mqc_print(IOut,hEVals,header='EVals after hMatMW SVD')
-
-!hph+
-!      call mqc_error('STOP 3')
-!hph-
-
+      if(extraPrint) then
+        call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,1:i)),header='Overlaps of v and first eVecs')
+        call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hMatProjectorVectors),header='Overlaps of v and v')
+        call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,i+1:)),header='Overlaps of v and normal modes')
+        call mqc_print(IOut,hEVecs,header='EVecs after hMatMW SVD')
+        call mqc_print(IOut,hEVals,header='EVals after hMatMW SVD')
+      endIf
       hEVals = hEVals*scale2wavenumber
       hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
       if(extraPrint) then
@@ -234,8 +212,8 @@ INCLUDE 'vibAnalysisMod.f03'
         call massWeighVector(.false.,atomicMasses,hEVecs(:,i))
         call mqc_normalizeVector(hEVecs(:,i))
       endDo
-      call mqc_print(IOut,hEVecs,header='Un-MW Left Eigenvectors')
       call mqc_print(iOut,hEVals,header='Eigenvalues (cm-1)')
+      call mqc_print(IOut,hEVecs,header='Displacements')
 !
   999 Continue
       write(iOut,*)' END OF VIBANALYSIS'

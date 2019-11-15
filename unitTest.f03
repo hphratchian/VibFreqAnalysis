@@ -19,7 +19,6 @@ INCLUDE 'vibAnalysisMod.f03'
 !     Variable Declarations
 !
       implicit none
-      integer(kind=int64),parameter::IOut=6
       integer(kind=int64)::nDim
       real(kind=real64),dimension(:),allocatable::eVals
       real(kind=real64),dimension(:,:),allocatable::mat,eVecs
