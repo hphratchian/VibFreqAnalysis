@@ -73,7 +73,7 @@ INCLUDE 'vibAnalysisMod.f03'
         nFrozenAtoms = nFrozenAtoms+1
       endDo
       if(extraPrint.or.nFrozenAtoms.gt.0)  &
-        call mqc_print(iOut,frozenAtoms,header='frozenAtoms list')
+        call mqc_print(frozenAtoms,iOut,header='frozenAtoms list')
 !
 !     Load the Cartesian coordinates.
 !
@@ -91,12 +91,12 @@ INCLUDE 'vibAnalysisMod.f03'
 !
       Allocate(atomicMasses(nAtoms))
       atomicMasses = GMatrixFile%getAtomWeights()
-      call mqc_print(iout,atomicMasses,header='Atomic Masses')
+      call mqc_print(atomicMasses,iOut,header='Atomic Masses')
       hMatMW = hMat
       call massWeighMatrix(.false.,atomicMasses,hMatMW)
-      if(extraPrint) call mqc_print(IOut,hMatMW,header='Hessian-FULL after MW''ing')
+      if(extraPrint) call mqc_print(hMatMW,iOut,header='Hessian-FULL after MW''ing')
       hMatMW = hMatMW*scaleHess
-      if(extraPrint) call mqc_print(IOut,hMatMW,header='Hessian-FULL after scaleHess')
+      if(extraPrint) call mqc_print(hMatMW,iOut,header='Hessian-FULL after scaleHess')
 !
 !     Diagonalize the mass-weighted hessian. This is done prior to projection of
 !     translation/rotation/frozen-atom constrains.
@@ -104,7 +104,7 @@ INCLUDE 'vibAnalysisMod.f03'
       call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
       hEVals = hEVals*scale2wavenumber
       hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
-      call mqc_print(IOut,hEVals,header='Initial MW Eigenvalues (cm-1)')
+      call mqc_print(hEVals,iOut,header='Initial MW Eigenvalues (cm-1)')
 !
 !     Determine the number of constraints, allocate space for the projector
 !     vectors, and initialize them.
@@ -149,7 +149,7 @@ INCLUDE 'vibAnalysisMod.f03'
         endDo
         deAllocate(tmpVec)
         if(extraPrint)  &
-          call mqc_print(IOut,hMatProjectorVectors,header='MW frozen atom constraints.')
+          call mqc_print(hMatProjectorVectors,iOut,header='MW frozen atom constraints.')
       endIf
 !
 !     Build projectors to remove overall translational degrees of freedom.
@@ -169,7 +169,7 @@ INCLUDE 'vibAnalysisMod.f03'
         endDo
         deAllocate(tmpVec)
         if(extraPrint)  &
-          call mqc_print(IOut,hMatProjectorVectors(:,1:3),header='MW translational projection vector.')
+          call mqc_print(hMatProjectorVectors(:,1:3),iOut,header='MW translational projection vector.')
       endIf
 !
 !     Determine the moments of inertia and principle axes of rotation. Then,
@@ -184,7 +184,7 @@ INCLUDE 'vibAnalysisMod.f03'
         call mqc_normalizeVector(RotVecs(:,3))
         if(extraPrint) then
           write(iOut,2100) nRot
-          call mqc_print(iOut,RotVecs,header='(Normalized) Rotational Constraint Vectors')
+          call mqc_print(RotVecs,iOut,header='(Normalized) Rotational Constraint Vectors')
         endIf
         call addConstraintVector(iCurrentProjector,nConstraints,RotVecs(:,1),  &
           hMatProjectorVectors)
@@ -197,10 +197,10 @@ INCLUDE 'vibAnalysisMod.f03'
 !     Build the projector based on hMatProjectorVectors.
 !
       Allocate(hMatProjector(nAt3,nAt3))
-      call mqc_print(iOut,hMatProjectorVectors,header='Projection Vectors')
+      call mqc_print(hMatProjectorVectors,iOut,header='Projection Vectors')
       hMatProjector = MatMul(hMatProjectorVectors,Transpose(hMatProjectorVectors))
       hMatProjector = unitMatrix(nAt3) - hMatProjector
-      call mqc_print(iOut,hMatProjector,header='Projection Matrix -- FINAL')
+      call mqc_print(hMatProjector,iOut,header='Projection Matrix -- FINAL')
 !
 !     Apply the projector to the MW Hessian and diagonalize again.
 !
@@ -209,21 +209,21 @@ INCLUDE 'vibAnalysisMod.f03'
       hMatMW = MatMul(MatMul(hMatProjector,hMatMW),hMatProjector)
       hMatMW = hMatMW*scaleHess
       if(extraPrint)  &
-        call mqc_print(IOut,hMatMW,header='Projected MW Hessian after scaleHess')
+        call mqc_print(hMatMW,iOut,header='Projected MW Hessian after scaleHess')
       call mySVD(iOut,nAt3,hMatMW,hEVals,hEVecs)
       i = 3+nRot
       if(extraPrint) then
-        call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,1:i)),header='Overlaps of v and first eVecs')
-        call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hMatProjectorVectors),header='Overlaps of v and v')
-        call mqc_print(iOut,MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,i+1:)),header='Overlaps of v and normal modes')
-        call mqc_print(IOut,hEVecs,header='EVecs after hMatMW SVD')
-        call mqc_print(IOut,hEVals,header='EVals after hMatMW SVD')
+        call mqc_print(MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,1:i)),iOut,header='Overlaps of v and first eVecs')
+        call mqc_print(MatMul(TRANSPOSE(hMatProjectorVectors),hMatProjectorVectors),iOut,header='Overlaps of v and v')
+        call mqc_print(MatMul(TRANSPOSE(hMatProjectorVectors),hEVecs(:,i+1:)),iOut,header='Overlaps of v and normal modes')
+        call mqc_print(hEVecs,iOut,header='EVecs after hMatMW SVD')
+        call mqc_print(hEVals,iOut,header='EVals after hMatMW SVD')
       endIf
       hEVals = hEVals*scale2wavenumber
       hEVals = SIGN(SQRT(ABS(hEVals)),hEVals)
       if(extraPrint) then
-        call mqc_print(IOut,hEVals,header='MW Eigenvalues (cm-1)')
-        call mqc_print(IOut,hEVecs,header='MW Left Eigenvectors')
+        call mqc_print(hEVals,iOut,header='MW Eigenvalues (cm-1)')
+        call mqc_print(hEVecs,iOut,header='MW Left Eigenvectors')
       endIf
 !
 !     Un-mass-weigh the eigenvectors and re-print them. Then, write out the
@@ -233,8 +233,8 @@ INCLUDE 'vibAnalysisMod.f03'
         call massWeighVector(.false.,atomicMasses,hEVecs(:,i))
         call mqc_normalizeVector(hEVecs(:,i))
       endDo
-      call mqc_print(iOut,hEVals,header='Eigenvalues (cm-1)')
-      call mqc_print(IOut,hEVecs,header='Displacements')
+      call mqc_print(hEVals,iOut,header='Eigenvalues (cm-1)')
+      call mqc_print(hEVecs,iOut,header='Displacements')
 !
   999 Continue
       write(iOut,*)' END OF VIBANALYSIS'

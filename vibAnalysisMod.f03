@@ -71,7 +71,7 @@
       do iTry = 1,nDim
         do i = 1,nHave
           call mqc_normalizeVector(vectorList(:,i))
-          call mqc_print(6,vector,header='Current Vector')
+          call mqc_print(vector,iOut,header='Current Vector')
           tmpMagnitude = dot_product(vectorList(:,i),vector)
           vector = vector - tmpMagnitude*vectorList(:,i)
           tmpMagnitude = dot_product(vector,vector)
@@ -83,7 +83,7 @@
       endDo
       if(tmpMagnitude.le.Small) call mqc_error('Failed making orthog vector.')
       call mqc_normalizeVector(vector)
-      call mqc_print(6,vector,header='FINAL Vector')
+      call mqc_print(vector,iOut,header='FINAL Vector')
       write(6,*)
       write(6,*)
 !
@@ -254,8 +254,8 @@
         eVals(i) = dot_product(EVecs(:,i),work)
       endDo
       if(extraPrint) then
-        call mqc_print(IOut,EVecs,header='mySVD: Left Eigenvectors')
-        call mqc_print(IOut,rightEVecs,header='mySVD: Right Eigenvectors')
+        call mqc_print(EVecs,iOut,header='mySVD: Left Eigenvectors')
+        call mqc_print(rightEVecs,iOut,header='mySVD: Right Eigenvectors')
       endIf
       DeAllocate(work)
 !
@@ -284,7 +284,7 @@
 !
 !     Begin by finding the center of mass.
 !
-      call mqc_print(iOut,cartesians,header='input cartesians (au)')
+      call mqc_print(cartesians,iOut,header='input cartesians (au)')
       totalMass = SUM(atomicMasses)
       centerOfMass = float(0)
       do i = 1,nAtoms
@@ -297,7 +297,7 @@
       Allocate(cartesiansCOM(3*nAtoms))
       cartesiansCOM = float(0)
       if(extraPrint)  &
-        call mqc_print(iout,cartesians,header='before moving to COM, carts:')
+        call mqc_print(cartesians,iOut,header='before moving to COM, carts:')
       do i = 1,nAtoms
         iCartOff = (i-1)*3
         cartesiansCOM(iCartOff+1) = cartesians(iCartOff+1) - centerOfMass(1)
@@ -305,8 +305,8 @@
         cartesiansCOM(iCartOff+3) = cartesians(iCartOff+3) - centerOfMass(3)
       endDo
       if(extraPrint) then
-        call mqc_print(iOut,centerOfMass,header='COM (au)')
-        call mqc_print(iOut,cartesiansCOM,header='cartesiansCOM (au)')
+        call mqc_print(centerOfMass,iOut,header='COM (au)')
+        call mqc_print(cartesiansCOM,iOut,header='cartesiansCOM (au)')
       endIf
 !
 !     Build the inertia matrix. Then, diagaonalize the matrix to solve for the
@@ -333,9 +333,9 @@
       inertiaMat(2,3) = inertiaMat(3,2)
       call mySVD(iOut,3,inertiaMat,inertiaEVals,inertiaEVecs)
       if(extraPrint) then
-        call mqc_print(iout,inertiaMat,header='Inertia Matrix:')
-        call mqc_print(IOut,inertiaEVals,header='inertia Eigenvalues')
-        call mqc_print(IOut,inertiaEVecs,header='inertia Eigenvectors')
+        call mqc_print(inertiaMat,iOut,header='Inertia Matrix:')
+        call mqc_print(inertiaEVals,iOut,header='inertia Eigenvalues')
+        call mqc_print(inertiaEVecs,iOut,header='inertia Eigenvectors')
       endIf
       do i = 1,3
         if(ABS(inertiaEVals(i)).gt.Small) nRot = nRot+1
@@ -373,7 +373,7 @@
       call massWeighVector(.true.,atomicMasses,RotVecs(:,1))
       call massWeighVector(.true.,atomicMasses,RotVecs(:,2))
       call massWeighVector(.true.,atomicMasses,RotVecs(:,3))
-      if(extraPrint) call mqc_print(iOut,RotVecs,header='Overall rotation vectors:')
+      if(extraPrint) call mqc_print(RotVecs,iOut,header='Overall rotation vectors:')
 !
       return
       end subroutine momentsOfInertia

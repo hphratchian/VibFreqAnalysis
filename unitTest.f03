@@ -42,11 +42,11 @@ INCLUDE 'vibAnalysisMod.f03'
       mat(1,2) = mat(2,1)
       mat(1,3) = mat(3,1)
       mat(2,3) = mat(3,2)
-      call mqc_print(iOut,mat,header='mat')
+      call mqc_print(mat,iOut,header='mat')
       call mySVD(iOut,nDim,mat,eVals,eVecs)
-      call mqc_print(iOut,mat,header='AFTER mySVD, mat')
-      call mqc_print(iOut,eVals,header='EigenValues')
-      call mqc_print(iOut,eVecs,header='EigenVectors')
+      call mqc_print(mat,iOut,header='AFTER mySVD, mat')
+      call mqc_print(eVals,iOut,header='EigenValues')
+      call mqc_print(eVecs,iOut,header='EigenVectors')
 !
   999 Continue
       write(iOut,*)' END OF unitTest'
